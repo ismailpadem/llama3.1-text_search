@@ -1,0 +1,13 @@
+syntax = "proto3";
+
+service PdfService {
+  rpc ExtractSentences (PdfRequest) returns (SentenceResponse);
+}
+
+message PdfRequest {
+  string pdf_path = 1;
+}
+
+message SentenceResponse {
+  repeated string sentences = 1;
+}
