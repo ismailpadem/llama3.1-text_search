@@ -13,8 +13,8 @@ import ollama
 from pinecone import Pinecone, ServerlessSpec
 
 
-pc = Pinecone(api_key="858ccd6d-530a-4430-a4c5-a374f612972a")
-index_name = "my-vector-index-llama"
+pc = Pinecone(api_key="API-KEY")
+index_name = "index-name"
 
 if index_name not in pc.list_indexes().names():
     pc.create_index(
