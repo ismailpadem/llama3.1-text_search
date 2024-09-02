@@ -142,7 +142,7 @@ pdf_processor = PdfProcessor(
 @app.post("/process")
 async def process_request(user_input: UserInput):
     try:
-        namespace = pdf_processor.process(user_input.pdf_path)
+        sentences, namespace = pdf_processor.process(user_input.pdf_path)
     
         results = query_similar_texts(user_input.text, namespace=namespace)
         
