@@ -12,22 +12,29 @@ def call_grpc(pdf_path):
     
 """    try:
         response = stub.ExtractSentences(request)
-        print(response.sentences)
         print("gRPC Response: ", response.sentences)
         return response.sentences
     except grpc.RpcError as e:
         print(f"gRPC Error: {e.details()}")
-        return []
-"""
+        return []"""
+
 def call_fastapi(user_text, pdf_path):
     url = "http://127.0.0.1:8000/process"
     data = {"text": user_text, "pdf_path": pdf_path}
 
     try:
         response = requests.post(url, json=data)
-        print("FastAPI Response: ", response.json())
+        response_data = response.json()
+        print("FastAPI Response: ", response_data['message'])
+        
+        # Display the similarity results
+        print("Similar texts found:")
+        for result in response_data.get('results', []):
+            print(f"ID: {result['id']}, Similarity: {result['similarity']}, Text: {result['text']}")
+        
     except Exception as e:
         print(f"FastAPI Error: {str(e)}")
+
 
 if __name__ == "__main__":
     pdf_path = input("Enter PDF path: ")
