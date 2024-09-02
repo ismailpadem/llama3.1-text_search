@@ -1,24 +1,18 @@
-#llama3.1-text_search
+**llama3.1-text_search**
 
-##This project processes PDF files to extract sentences, embeds them using a language model, and stores them in a Pinecone index. It provides both gRPC and FastAPI interfaces to query for similar sentences.
+*This project processes PDF files to extract sentences, embeds them using a language model, and stores them in a Pinecone index. It provides both gRPC and FastAPI interfaces to query for similar sentences.**
 
+*To run the project, first download Ollama from*: 
+`https://ollama.com/download`
 
-Projeyi çalıştırabilmek için ilk olarak Ollama'yı indirin.
-https://ollama.com/download
-
-
-Ollama llama3.1 modülünü indirin
-
+Download the Ollama llama3.1 module:
 `ollama pull llama3.1`
 
-Gerekli kütüphaneleri indirin.
-
+Install the required packages:
 `pip install -r requirements.txt`
 
-server'ı çalıştırın
-
+Start the server:
 `python server.py`
 
-client'ı çalıştırın ve pdf yolunu ve aranacak metni girin
-
-'python client.py'
+Run the client and enter the path to the PDF and the text to search:
+`python client.py`
