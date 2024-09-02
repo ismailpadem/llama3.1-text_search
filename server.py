@@ -13,8 +13,8 @@ import ollama
 from pinecone import Pinecone, ServerlessSpec
 
 
-pc = Pinecone(api_key="API-KEY")
-index_name = "index_name"
+pc = Pinecone(api_key="858ccd6d-530a-4430-a4c5-a374f612972a")
+index_name = "my-vector-index-llama"
 
 if index_name not in pc.list_indexes().names():
     pc.create_index(
@@ -59,104 +59,107 @@ def split_text_into_sentences(text):
     sentences = [sentence.strip() for sentence in sentences if sentence.strip()]
     return sentences
 
-def process_pdf(file_path, user_text):
-    file_hash = calculate_file_hash(file_path)
-    namespace = f"namespace-{file_hash[:10]}"  
+class PdfProcessor:
+    def __init__(self, index, embedder, parser, splitter):
+        self.index = index
+        self.embed_text = embedder
+        self.parse_pdf = parser
+        self.split_text = splitter
 
+    def process(self, file_path):
+        file_hash = calculate_file_hash(file_path)
+        namespace = f"namespace-{file_hash[:10]}"  
 
-    results = index.query(
-        vector=[0]*4096, 
-        top_k=1, 
-        include_metadata=True, 
-        filter={"hash": file_hash},
-        namespace=namespace
-    )
-    
-    if results["matches"]:
-        print(f"File already processed. Retrieving from database...")
-    else:
-        print(f"File not processed. Embedding and saving...")
-        try:
-            raw = parser.from_file(file_path)
-            text = raw['content'].strip()
-            sentences = split_text_into_sentences(text)
+        results = self.index.query(
+            vector=[0]*4096, 
+            top_k=1, 
+            include_metadata=True, 
+            filter={"hash": file_hash},
+            namespace=namespace
+        )
+        
+        if results["matches"]:
+            print(f"File already processed. Retrieving from database...")
+            sentences = [match['metadata']['text'] for match in results['matches']]
+        else:
+            print(f"File not processed. Embedding and saving...")
+            try:
+                raw = self.parse_pdf(file_path)
+                text = raw['content'].strip()
+                sentences = self.split_text(text)
 
-            for i, sentence in enumerate(sentences):
-                embed = embed_text(sentence)
-                unique_id = f"{file_hash[:10]}-sentence-{i}"
-                index.upsert(vectors=[{
-                    'id': unique_id,
-                    'values': embed,
-                    'metadata': {'text': sentence, 'hash': file_hash}
-                }], namespace=namespace)
-            print(f"Sentences successfully saved.")
+                for i, sentence in enumerate(sentences):
+                    embed = self.embed_text(sentence)
+                    unique_id = f"{file_hash[:10]}-sentence-{i}"
+                    self.index.upsert(vectors=[{
+                        'id': unique_id,
+                        'values': embed,
+                        'metadata': {'text': sentence, 'hash': file_hash}
+                    }], namespace=namespace)
+                print(f"Sentences successfully saved.")
 
-        except FileNotFoundError:
-            print(f"{file_path} not found. Please check the file path.")
-        except Exception as e:
-            print(f"Error occurred: {e}")
+            except FileNotFoundError:
+                print(f"{file_path} not found. Please check the file path.")
+                raise
+            except Exception as e:
+                print(f"Error occurred: {e}")
+                raise
 
-
-    query_similar_texts(user_text, namespace=namespace)
+        return sentences, namespace
 
 def query_similar_texts(user_text, threshold=0.5, namespace=None):
-   
     user_embedding = embed_text(user_text)
     results = index.query(
         vector=user_embedding, 
-        top_k=10,               # En benzer 10 sonuç
+        top_k=10,
         include_values=True,
         include_metadata=True,
-        namespace=namespace      
+        namespace=namespace
     )
-    
-    # print("Query result:")
-    # print(results)  # Debug print to check raw query result
 
-    print("Results above similarity threshold:")
+    print(f"Raw results from query: {results}")  # Sorgu sonucunu kontrol edin
+
+    filtered_results = []
     for match in results['matches']:
         similarity = match['score']
-        if similarity >= threshold:  # filtreleme
-            print(f"ID: {match['id']}, Similarity: {similarity}, Text: {match['metadata']['text']}")
+        if similarity >= threshold:
+            filtered_results.append({
+                "id": match['id'],
+                "similarity": similarity,
+                "text": match['metadata']['text']
+            })
+    
+    return filtered_results
+
+# Initialize PdfProcessor
+pdf_processor = PdfProcessor(
+    index=index,
+    embedder=embed_text,
+    parser=parser.from_file,
+    splitter=split_text_into_sentences
+)
 
 @app.post("/process")
 async def process_request(user_input: UserInput):
-    process_pdf(user_input.pdf_path, user_input.text)
-    return {"message": "PDF processing and querying complete."}
+    try:
+        # PDF'i işle ve embedding'leri veritabanına kaydet
+        sentences, namespace = pdf_processor.process(user_input.pdf_path)
+        
+        # Benzer metinleri sorgula
+        results = query_similar_texts(user_input.text, namespace=namespace)
+        
+        return {"message": "PDF processing and querying complete.", "results": results}
+    except Exception as e:
+        return {"error": str(e)}
 
 # gRPC service
 class PdfService(extract_sentences_pb2_grpc.PdfServiceServicer):
     def ExtractSentences(self, request, context):
         pdf_path = request.pdf_path
         try:
-            file_hash = calculate_file_hash(pdf_path)
-            namespace = f"namespace-{file_hash[:10]}"
+            sentences, _ = pdf_processor.process(pdf_path)
+            print(f"Sentences extracted: {sentences}")
 
-            results = index.query(
-                vector=[0]*4096, 
-                top_k=1, 
-                include_metadata=True, 
-                filter={"hash": file_hash},
-                namespace=namespace
-            )
-            
-            if results["matches"]:
-                print(f"File already processed. Retrieving from database...")
-                sentences = [match['metadata']['text'] for match in results['matches']]
-            else:
-                raw = parser.from_file(pdf_path)
-                full_text = raw['content'].strip()
-                sentences = split_text_into_sentences(full_text)
-
-                for i, sentence in enumerate(sentences):
-                    embed = embed_text(sentence)
-                    unique_id = f"{file_hash[:10]}-sentence-{i}"
-                    index.upsert(vectors=[{
-                        'id': unique_id,
-                        'values': embed,
-                        'metadata': {'text': sentence, 'hash': file_hash}
-                    }], namespace=namespace)
-            
             response = extract_sentences_pb2.SentenceResponse()
             response.sentences.extend(sentences)
             return response
@@ -171,7 +174,6 @@ def serve_grpc():
     server.add_insecure_port('[::]:50051')
     server.start()
     print("gRPC server is running...")
-
     try:
         server.wait_for_termination()
     except KeyboardInterrupt:
