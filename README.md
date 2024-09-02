@@ -1,6 +1,6 @@
 **llama3.1-text_search**
 
-*This project processes PDF files to extract sentences, embeds them using a language model, and stores them in a Pinecone index. It provides both gRPC and FastAPI interfaces to query for similar sentences.**
+*This project processes PDF files to extract sentences, embeds them using a language model, and stores them in a Pinecone index.*
 
 *To run the project, first download Ollama from*: 
 `https://ollama.com/download`
