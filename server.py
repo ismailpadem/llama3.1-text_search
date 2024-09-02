@@ -13,8 +13,8 @@ import ollama
 from pinecone import Pinecone, ServerlessSpec
 
 
-pc = Pinecone(api_key="API-KEY")
-index_name = "index-name"
+pc = Pinecone(api_key="858ccd6d-530a-4430-a4c5-a374f612972a")
+index_name = "my-vector-index-llama"
 
 if index_name not in pc.list_indexes().names():
     pc.create_index(
@@ -117,7 +117,7 @@ def query_similar_texts(user_text, threshold=0.5, namespace=None):
         namespace=namespace
     )
 
-    print(f"Raw results from query: {results}")  # Sorgu sonucunu kontrol edin
+    print(f"Raw results from query: {results}")
 
     filtered_results = []
     for match in results['matches']:
@@ -131,7 +131,7 @@ def query_similar_texts(user_text, threshold=0.5, namespace=None):
     
     return filtered_results
 
-# Initialize PdfProcessor
+
 pdf_processor = PdfProcessor(
     index=index,
     embedder=embed_text,
@@ -142,10 +142,8 @@ pdf_processor = PdfProcessor(
 @app.post("/process")
 async def process_request(user_input: UserInput):
     try:
-        # PDF'i işle ve embedding'leri veritabanına kaydet
-        sentences, namespace = pdf_processor.process(user_input.pdf_path)
-        
-        # Benzer metinleri sorgula
+        namespace = pdf_processor.process(user_input.pdf_path)
+    
         results = query_similar_texts(user_input.text, namespace=namespace)
         
         return {"message": "PDF processing and querying complete.", "results": results}
